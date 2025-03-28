@@ -23,11 +23,11 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   late GoogleMapController mapController;
 
-  final LatLng _initialPosition = LatLng(35.6895, -0.6412); // Örnek başlangıç konumu
+  final LatLng _initialPosition = LatLng(35.6896, -0.6412); 
   final Set<Marker> _markers = {
     Marker(
       markerId: MarkerId('1'),
-      position: LatLng(35.6895, -0.6412),
+      position: LatLng(35.6896, -0.6412),
       infoWindow: InfoWindow(title: 'Şarj İstasyonu 1'),
     ),
     Marker(
@@ -61,7 +61,7 @@ class _MapScreenState extends State<MapScreen> {
             onMapCreated: _onMapCreated,
             initialCameraPosition: CameraPosition(
               target: _initialPosition,
-              zoom: 6.0,
+              zoom: 7.0,
             ),
             markers: _markers,
           ),
@@ -91,9 +91,9 @@ class _MapScreenState extends State<MapScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.add_location), label: 'İstasyon Ekle'),
         ],
         onTap: (index) {
-          // Sayfa değişim mantığı buraya yazılabilir
+          
         },
-      ),
+     ) ,
     );
   }
 }
