@@ -50,7 +50,6 @@ class _MapScreenState extends State<MapScreen> {
           IconButton(
             icon: Icon(Icons.person),
             onPressed: () {
-              // Profil sayfasına yönlendirme
             },
           ),
         ],
