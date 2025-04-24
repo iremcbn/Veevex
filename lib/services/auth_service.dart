@@ -36,13 +36,11 @@ class AuthService {
 
     Future<User?> registerWithEmail(String email, String password) async {
   try {
-    final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    UserCredential userCredential = await  FirebaseAuth.instance
+        .createUserWithEmailAndPassword(email: email, password: password);
     return userCredential.user;
   } catch (e) {
-    print("Kayıt hatası: $e");
+    print("Register Error: $e");
     return null;
   }
 }

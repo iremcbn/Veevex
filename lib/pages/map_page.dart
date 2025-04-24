@@ -1,146 +1,79 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';  
-import '../services/api_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class MapPage extends StatefulWidget {
+  const MapPage({Key? key}) : super(key: key);
+
   @override
-  _MapPageState createState() => _MapPageState();
+  State<MapPage> createState() => _MapPageState();
 }
 
 class _MapPageState extends State<MapPage> {
-  List<dynamic> chargingStations = [];
-  Position? _currentPosition;  
-
-  late MapController mapController;  
+  List<Marker> _markers = [];
 
   @override
   void initState() {
     super.initState();
-    fetchChargingStations();
-    _getCurrentLocation();  
-    mapController = MapController(); 
+    _fetchStations();
   }
 
-  Future<void> fetchChargingStations() async {
-    try {
-      var stations = await OpenChargeMapService().getChargingStations(40.9826, 29.0322);
-      setState(() {
-        chargingStations = stations;
-      });
-    } catch (e) {
-      print("Hata: $e");
-    }
-  }
+  Future<void> _fetchStations() async {
+    final url = Uri.parse(
+        'https://api.openchargemap.io/v3/poi/?output=json&countrycode=TR&latitude=40.3522&longitude=27.9706&distance=10&distanceunit=KM');
 
-  
-  Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+    final response = await http.get(url);
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      print("Konum servisleri kapalı.");
-      return;
-    }
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
 
+      List<Marker> loadedMarkers = [];
+      for (var station in data) {
+        final lat = station['AddressInfo']['Latitude'];
+        final lon = station['AddressInfo']['Longitude'];
+        final title = station['AddressInfo']['Title'];
 
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        print("Konum izni reddedildi.");
-        return;
+        loadedMarkers.add(
+          Marker(
+            width: 80.0,
+            height: 80.0,
+            point: LatLng(lat, lon),
+            builder: (ctx) => Icon(
+              Icons.ev_station,
+              color: Colors.green,
+              size: 40,
+            ),
+          ),
+        );
       }
+
+      setState(() {
+        _markers = loadedMarkers;
+      });
+    } else {
+      print('API error: ${response.statusCode}');
     }
-
-    if (permission == LocationPermission.deniedForever) {
-      print("Konum izni kalıcı olarak reddedildi.");
-      return;
-    }
-
-
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-
-    setState(() {
-      _currentPosition = position;  
-    });
-  }
-
-  void _updateLocation() async {
-    Position newPosition = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-    
-    setState(() {
-      _currentPosition = newPosition; 
-    });
-
-    mapController.move(
-      LatLng(newPosition.latitude, newPosition.longitude),  
-      14.0,  
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Şarj İstasyonları Haritası")),
-      body: _currentPosition == null  
-          ? Center(child: CircularProgressIndicator())
-          : FlutterMap(
-              mapController: mapController,  
-              options: MapOptions(
-                center: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),  
-                zoom: 12,
-                onPositionChanged: (MapPosition position, bool hasGesture) {
-                  if (hasGesture) {
-                    _updateLocation();
-                  }
-                },
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                  subdomains: ['a', 'b', 'c'],
-                ),
-                MarkerLayer(
-                  markers: chargingStations.map((station) {
-                    return Marker(
-                      point: LatLng(
-                        station['AddressInfo']['Latitude'],
-                        station['AddressInfo']['Longitude'],
-                      ),
-                      width: 40,
-                      height: 40,
-                      builder: (context) => Icon(
-                        Icons.location_pin,
-                        color: Colors.red,
-                        size: 30,
-                      ),
-                    );
-                  }).toList(),
-                ),
-                if (_currentPosition != null)
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-                        width: 40,
-                        height: 40,
-                        builder: (context) => Icon(
-                          Icons.person_pin,
-                          color: Colors.blue,
-                          size: 40,
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
+      appBar: AppBar(title: Text("Harita")),
+      body: FlutterMap(
+        options: MapOptions(
+          center: LatLng(40.3522, 27.9706),
+          zoom: 13.0,
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            subdomains: ['a', 'b', 'c'],
+          ),
+          MarkerLayer(markers: _markers),
+        ],
+      ),
     );
   }
 }

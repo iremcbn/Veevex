@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'map_page.dart';  
+import 'map_page.dart';
 import '../services/auth_service.dart';
 
 class HomePage extends StatelessWidget {
@@ -12,20 +12,19 @@ class HomePage extends StatelessWidget {
       body: Center(
         child: ElevatedButton.icon(
           icon: Icon(Icons.login),
-          label: Text("Google ile Giriş Yap"),
+          label: Text("Google ile Giriş Yap"),
           onPressed: () async {
             final user = await authService.signInWithGoogle();
             if (user != null) {
               print("Giriş yapan kullanıcı: ${user.displayName}");
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => MapPage()),
+              );
             } else {
               print("Giriş başarısız");
             }
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => MapPage()),
-            );
           },
-          child: Text("Haritada Şarj İstasyonlarını Gör"),
         ),
       ),
     );
