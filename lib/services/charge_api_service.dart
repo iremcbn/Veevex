@@ -8,7 +8,7 @@ class ChargeApiService {
         'https://api.openchargemap.io/v3/poi/?output=json&countrycode=TR&latitude=$latitude&longitude=$longitude&maxresults=20&compact=true&verbose=false');
 
     final response = await http.get(url, headers: {
-      'X-API-Key': 'SENİN_API_KEYİN'
+      'X-API-Key': 'ec9a2cf1-dcff-482c-9489-49fb79fdac87'
     });
 
     if (response.statusCode == 200) {
