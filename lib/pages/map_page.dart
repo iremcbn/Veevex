@@ -144,16 +144,17 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  Future<void> _saveReservation(String stationTitle) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  Future<void> _saveReservation(String stationTitle, DateTime selectedDateTime) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
 
-    await FirebaseFirestore.instance.collection('reservations').add({
-      'userId': user.uid,
-      'stationTitle': stationTitle,
-      'timestamp': Timestamp.now(),
-    });
-  }
+  await FirebaseFirestore.instance.collection('reservations').add({
+    'userId': user.uid,
+    'stationTitle': stationTitle,
+    'timestamp': Timestamp.now(),
+    'reservationTime': Timestamp.fromDate(selectedDateTime), // Yeni eklenen alan
+  });
+}
 
   Future<String?> _getTextInput(String hint) async {
     String input = '';
@@ -175,30 +176,59 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-  void _showReservationDialog(String stationTitle) {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text("Rezervasyon"),
-          content: Text("$stationTitle istasyonuna rezervasyon yapmak istiyor musunuz?"),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text("İptal")),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await _saveReservation(stationTitle);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text("Rezervasyon gönderildi."),
-                ));
-              },
-              child: Text("Evet"),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  void _showReservationDialog(String stationTitle) async {
+  DateTime? selectedDate = await showDatePicker(
+    context: context,
+    initialDate: DateTime.now(),
+    firstDate: DateTime.now(),
+    lastDate: DateTime.now().add(Duration(days: 30)),
+  );
+
+  if (selectedDate == null) return;
+
+  TimeOfDay? selectedTime = await showTimePicker(
+    context: context,
+    initialTime: TimeOfDay.now(),
+  );
+
+  if (selectedTime == null) return;
+
+  final selectedDateTime = DateTime(
+    selectedDate.year,
+    selectedDate.month,
+    selectedDate.day,
+    selectedTime.hour,
+    selectedTime.minute,
+  );
+
+  showDialog(
+    context: context,
+    builder: (ctx) {
+      return AlertDialog(
+        title: Text("Rezervasyon"),
+        content: Text(
+          "$stationTitle istasyonuna şu tarih için rezervasyon yapmak istiyor musunuz?\n\n${selectedDateTime.toLocal()}",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text("İptal"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _saveReservation(stationTitle, selectedDateTime);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text("Rezervasyon gönderildi."),
+              ));
+            },
+            child: Text("Evet"),
+          ),
+        ],
+      );
+    },
+  );
+}
 
   Future<void> _addCustomStation(LatLng point) async {
     String? title = await _getTextInput("İstasyon Başlığı Gir:");
