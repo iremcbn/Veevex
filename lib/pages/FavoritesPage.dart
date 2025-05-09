@@ -1,9 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 
-class ReservationHistoryPage extends StatelessWidget {
-  const ReservationHistoryPage({Key? key}) : super(key: key);
+class FavoritesPage extends StatelessWidget {
+  const FavoritesPage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -11,13 +11,12 @@ class ReservationHistoryPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Rezervasyon Geçmişim"),
+        title: const Text("Favori İstasyonlarım"),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('reservations')
+            .collection('favorites')
             .where('userId', isEqualTo: uid)
-            .orderBy('timestamp', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -25,21 +24,23 @@ class ReservationHistoryPage extends StatelessWidget {
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('Hiç rezervasyon bulunamadı.'));
+            return const Center(child: Text('Hiç favori istasyon bulunamadı.'));
           }
 
+          final favoriteDocs = snapshot.data!.docs;
+
           return ListView.builder(
-            itemCount: snapshot.data!.docs.length,
+            itemCount: favoriteDocs.length,
             itemBuilder: (context, index) {
-              var reservation = snapshot.data!.docs[index];
+              final favorite = favoriteDocs[index];
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: ListTile(
-                  title: Text(reservation['stationName'] ?? 'İstasyon'),
+                  title: Text(favorite['stationName'] ?? 'İstasyon'),
                   subtitle: Text(
-                    "Tarih: ${reservation['timestamp'].toDate()}",
+                    "Konum: ${favorite['latitude'].toStringAsFixed(4)}, ${favorite['longitude'].toStringAsFixed(4)}",
                   ),
-                  trailing: Icon(Icons.ev_station),
+                  trailing: const Icon(Icons.favorite, color: Colors.red),
                 ),
               );
             },

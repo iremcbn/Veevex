@@ -14,7 +14,7 @@ class HomePage extends StatelessWidget {
           icon: Icon(Icons.login),
           label: Text("Google ile Giriş Yap"),
           onPressed: () async {
-            final user = await authService.signInWithGoogle();
+            final user = await authService.signInWithGoogle(context);
             if (user != null) {
               print("Giriş yapan kullanıcı: ${user.displayName}");
               Navigator.push(

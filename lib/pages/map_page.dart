@@ -5,7 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
-import 'profile_page.dart'; 
+import 'package:geolocator/geolocator.dart';
+import 'profile_page.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({Key? key}) : super(key: key);
@@ -16,74 +17,107 @@ class MapPage extends StatefulWidget {
 
 class _MapPageState extends State<MapPage> {
   List<Marker> _markers = [];
+  LatLng? _userLocation;
+  Marker? _nearestMarker;
+  String _searchQuery = ''; 
+  double _maxDistance = 50; 
+  String _chargeTypeFilter = ''; 
 
   @override
   void initState() {
     super.initState();
     _fetchStations();
     _loadCustomStations();
+    _getUserLocation();  
+  }
+
+  Future<void> _getUserLocation() async {
+    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    setState(() {
+      _userLocation = LatLng(position.latitude, position.longitude);
+    });
   }
 
   Future<void> _fetchStations() async {
     final url = Uri.parse(
-      'https://api.openchargemap.io/v3/poi/?output=json&countrycode=TR&latitude=40.3522&longitude=27.9706&distance=10&distanceunit=KM',
+      'https://api.openchargemap.io/v3/poi/?output=json&countrycode=TR&latitude=40.3522&longitude=27.9706&distance=$_maxDistance&distanceunit=KM',
     );
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-
       List<Marker> loadedMarkers = [];
+      Marker? nearestMarker;
+      double nearestDistance = double.infinity;
+
       for (var station in data) {
         final lat = station['AddressInfo']['Latitude'];
         final lon = station['AddressInfo']['Longitude'];
         final title = station['AddressInfo']['Title'];
+        final stationPosition = LatLng(lat, lon);
+
+        if (_searchQuery.isNotEmpty && !title.toLowerCase().contains(_searchQuery.toLowerCase())) {
+          continue;
+        }
+
+        if (_chargeTypeFilter.isNotEmpty &&
+            !station['Connections']
+                .any((connection) => connection['ConnectionType']['Title'].toLowerCase().contains(_chargeTypeFilter.toLowerCase()))) {
+          continue;
+        }
+
+        if (_userLocation != null) {
+          double distance = _calculateDistance(_userLocation!, stationPosition);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestMarker = Marker(
+              width: 80.0,
+              height: 80.0,
+              point: stationPosition,
+              builder: (ctx) => Icon(
+                Icons.ev_station,
+                color: Colors.red, 
+                size: 40,
+              ),
+            );
+          }
+        }
 
         loadedMarkers.add(
           Marker(
             width: 80.0,
             height: 80.0,
-            point: LatLng(lat, lon),
+            point: stationPosition,
             builder: (ctx) => Icon(
               Icons.ev_station,
-              color: Colors.green,
+              color: Colors.green, 
               size: 40,
             ),
           ),
         );
       }
 
+      if (nearestMarker != null) {
+        loadedMarkers.add(nearestMarker);
+      }
+
       setState(() {
         _markers.addAll(loadedMarkers);
+        _nearestMarker = nearestMarker;
       });
     } else {
       print('API error: ${response.statusCode}');
     }
   }
 
-  Future<void> _addCustomStation(LatLng point) async {
-    String? title = await _getTextInput("İstasyon Başlığı Gir:");
-    if (title == null || title.isEmpty) return;
-
-    FirebaseFirestore.instance.collection('customStations').add({
-      'title': title,
-      'latitude': point.latitude,
-      'longitude': point.longitude,
-    });
-
-    setState(() {
-      _markers.add(
-        Marker(
-          width: 80.0,
-          height: 80.0,
-          point: point,
-          builder: (ctx) => GestureDetector(
-            onTap: () => _showReservationDialog(title),
-            child: Icon(Icons.ev_station, color: Colors.orange, size: 40),
-          ),
-        ),
-      );
-    });
+  double _calculateDistance(LatLng userLocation, LatLng stationLocation) {
+    final double distanceInMeters = Geolocator.distanceBetween(
+      userLocation.latitude,
+      userLocation.longitude,
+      stationLocation.latitude,
+      stationLocation.longitude,
+    );
+    return distanceInMeters;  
   }
 
   Future<void> _loadCustomStations() async {
@@ -166,6 +200,31 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
+  Future<void> _addCustomStation(LatLng point) async {
+    String? title = await _getTextInput("İstasyon Başlığı Gir:");
+    if (title == null || title.isEmpty) return;
+
+    FirebaseFirestore.instance.collection('customStations').add({
+      'title': title,
+      'latitude': point.latitude,
+      'longitude': point.longitude,
+    });
+
+    setState(() {
+      _markers.add(
+        Marker(
+          width: 80.0,
+          height: 80.0,
+          point: point,
+          builder: (ctx) => GestureDetector(
+            onTap: () => _showReservationDialog(title),
+            child: Icon(Icons.ev_station, color: Colors.orange, size: 40),
+          ),
+        ),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -183,20 +242,57 @@ class _MapPageState extends State<MapPage> {
           ),
         ],
       ),
-      body: FlutterMap(
-        options: MapOptions(
-          center: LatLng(40.3522, 27.9706), 
-          zoom: 13.0,
-          onLongPress: (tapPos, latlng) {
-            _addCustomStation(latlng); 
-          },
-        ),
+      body: Column(
         children: [
-          TileLayer(
-            urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-            subdomains: ['a', 'b', 'c'],
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+                _fetchStations(); 
+              },
+              decoration: InputDecoration(
+                hintText: 'İstasyon Ara...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+            ),
           ),
-          MarkerLayer(markers: _markers), 
+          DropdownButton<String>(
+            value: _chargeTypeFilter,
+            onChanged: (value) {
+              setState(() {
+                _chargeTypeFilter = value!;
+              });
+              _fetchStations(); 
+            },
+            items: <String>['', 'AC', 'DC', 'Hızlı Şarj'].map<DropdownMenuItem<String>>((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Text(value),
+              );
+            }).toList(),
+          ),
+          Expanded(
+            child: FlutterMap(
+              options: MapOptions(
+                center: _userLocation ?? LatLng(40.3522, 27.9706),
+                zoom: 13.0,
+                onTap: (tapPosition, point) => _addCustomStation(point),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                  subdomains: ['a', 'b', 'c'],
+                ),
+                MarkerLayer(
+                  markers: _markers,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
