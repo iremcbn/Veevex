@@ -8,7 +8,7 @@ class FavoritesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String uid = FirebaseAuth.instance.currentUser!.uid;
-
+    
     return Scaffold(
       appBar: AppBar(title: const Text("Favori İstasyonlarım")),
       body: StreamBuilder<QuerySnapshot>(

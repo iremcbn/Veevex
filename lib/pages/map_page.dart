@@ -7,6 +7,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'profile_page.dart';
+import 'payment_page.dart';
+
 
 class MapPage extends StatefulWidget {
   const MapPage({Key? key}) : super(key: key);
@@ -19,20 +21,22 @@ class _MapPageState extends State<MapPage> {
   List<Marker> _markers = [];
   LatLng? _userLocation;
   Marker? _nearestMarker;
-  String _searchQuery = ''; 
-  double _maxDistance = 50; 
-  String _chargeTypeFilter = ''; 
+  String _searchQuery = '';
+  double _maxDistance = 50;
+  String _chargeTypeFilter = '';
 
   @override
   void initState() {
     super.initState();
-    _fetchStations();
-    _loadCustomStations();
-    _getUserLocation();  
+    _getUserLocation().then((_) {
+      _fetchStations();
+      _loadCustomStations();
+    });
   }
 
   Future<void> _getUserLocation() async {
-    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
     setState(() {
       _userLocation = LatLng(position.latitude, position.longitude);
     });
@@ -56,27 +60,31 @@ class _MapPageState extends State<MapPage> {
         final title = station['AddressInfo']['Title'];
         final stationPosition = LatLng(lat, lon);
 
-        if (_searchQuery.isNotEmpty && !title.toLowerCase().contains(_searchQuery.toLowerCase())) {
+        if (_searchQuery.isNotEmpty &&
+            !title.toLowerCase().contains(_searchQuery.toLowerCase())) {
           continue;
         }
 
         if (_chargeTypeFilter.isNotEmpty &&
-            !station['Connections']
-                .any((connection) => connection['ConnectionType']['Title'].toLowerCase().contains(_chargeTypeFilter.toLowerCase()))) {
+            !station['Connections'].any((connection) =>
+                connection['ConnectionType']['Title']
+                    .toLowerCase()
+                    .contains(_chargeTypeFilter.toLowerCase()))) {
           continue;
         }
 
         if (_userLocation != null) {
-          double distance = _calculateDistance(_userLocation!, stationPosition);
+          double distance =
+              _calculateDistance(_userLocation!, stationPosition);
           if (distance < nearestDistance) {
             nearestDistance = distance;
             nearestMarker = Marker(
               width: 80.0,
               height: 80.0,
               point: stationPosition,
-              builder: (ctx) => Icon(
+              builder: (BuildContext context) => Icon(
                 Icons.ev_station,
-                color: Colors.red, 
+                color: Colors.red,
                 size: 40,
               ),
             );
@@ -88,9 +96,9 @@ class _MapPageState extends State<MapPage> {
             width: 80.0,
             height: 80.0,
             point: stationPosition,
-            builder: (ctx) => Icon(
+            builder: (BuildContext context) => Icon(
               Icons.ev_station,
-              color: Colors.green, 
+              color: Colors.green,
               size: 40,
             ),
           ),
@@ -102,7 +110,7 @@ class _MapPageState extends State<MapPage> {
       }
 
       setState(() {
-        _markers.addAll(loadedMarkers);
+        _markers = loadedMarkers;
         _nearestMarker = nearestMarker;
       });
     } else {
@@ -111,17 +119,17 @@ class _MapPageState extends State<MapPage> {
   }
 
   double _calculateDistance(LatLng userLocation, LatLng stationLocation) {
-    final double distanceInMeters = Geolocator.distanceBetween(
+    return Geolocator.distanceBetween(
       userLocation.latitude,
       userLocation.longitude,
       stationLocation.latitude,
       stationLocation.longitude,
     );
-    return distanceInMeters;  
   }
 
   Future<void> _loadCustomStations() async {
-    final snapshot = await FirebaseFirestore.instance.collection('customStations').get();
+    final snapshot =
+        await FirebaseFirestore.instance.collection('customStations').get();
     for (var doc in snapshot.docs) {
       final data = doc.data();
       final title = data['title'];
@@ -134,7 +142,7 @@ class _MapPageState extends State<MapPage> {
             width: 80.0,
             height: 80.0,
             point: LatLng(lat, lon),
-            builder: (ctx) => GestureDetector(
+            builder: (BuildContext context) => GestureDetector(
               onTap: () => _showReservationDialog(title),
               child: Icon(Icons.ev_station, color: Colors.orange, size: 40),
             ),
@@ -144,17 +152,18 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  Future<void> _saveReservation(String stationTitle, DateTime selectedDateTime) async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return;
+  Future<void> _saveReservation(
+      String stationTitle, DateTime selectedDateTime) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-  await FirebaseFirestore.instance.collection('reservations').add({
-    'userId': user.uid,
-    'stationTitle': stationTitle,
-    'timestamp': Timestamp.now(),
-    'reservationTime': Timestamp.fromDate(selectedDateTime), // Yeni eklenen alan
-  });
-}
+    await FirebaseFirestore.instance.collection('reservations').add({
+      'userId': user.uid,
+      'stationTitle': stationTitle,
+      'timestamp': Timestamp.now(),
+      'reservationTime': Timestamp.fromDate(selectedDateTime),
+    });
+  }
 
   Future<String?> _getTextInput(String hint) async {
     String input = '';
@@ -168,15 +177,18 @@ class _MapPageState extends State<MapPage> {
             decoration: InputDecoration(hintText: "örn: Evdeki Şarj Noktam"),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text("İptal")),
-            ElevatedButton(onPressed: () => Navigator.pop(ctx, input), child: Text("Kaydet")),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: Text("İptal")),
+            ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, input),
+                child: Text("Kaydet")),
           ],
         );
       },
     );
   }
 
-  void _showReservationDialog(String stationTitle) async {
+    void _showReservationDialog(String stationTitle) async {
   DateTime? selectedDate = await showDatePicker(
     context: context,
     initialDate: DateTime.now(),
@@ -218,9 +230,27 @@ class _MapPageState extends State<MapPage> {
             onPressed: () async {
               Navigator.pop(ctx);
               await _saveReservation(stationTitle, selectedDateTime);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text("Rezervasyon gönderildi."),
-              ));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Rezervasyon kaydedildi.")),
+              );
+
+              final paymentUrl = "https://example.com/odeme?station=$stationTitle&time=$selectedDateTime"; 
+              final paymentResult = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PaymentPage(paymentUrl: paymentUrl),
+                ),
+              );
+
+              if (paymentResult == true) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Ödeme başarılı!")),
+                );
+              } else if (paymentResult == false) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Ödeme başarısız veya iptal edildi.")),
+                );
+              }
             },
             child: Text("Evet"),
           ),
@@ -229,6 +259,7 @@ class _MapPageState extends State<MapPage> {
     },
   );
 }
+
 
   Future<void> _addCustomStation(LatLng point) async {
     String? title = await _getTextInput("İstasyon Başlığı Gir:");
@@ -246,7 +277,7 @@ class _MapPageState extends State<MapPage> {
           width: 80.0,
           height: 80.0,
           point: point,
-          builder: (ctx) => GestureDetector(
+          builder: (BuildContext context) => GestureDetector(
             onTap: () => _showReservationDialog(title),
             child: Icon(Icons.ev_station, color: Colors.orange, size: 40),
           ),
@@ -281,7 +312,7 @@ class _MapPageState extends State<MapPage> {
                 setState(() {
                   _searchQuery = value;
                 });
-                _fetchStations(); 
+                _fetchStations();
               },
               decoration: InputDecoration(
                 hintText: 'İstasyon Ara...',
@@ -290,20 +321,25 @@ class _MapPageState extends State<MapPage> {
               ),
             ),
           ),
-          DropdownButton<String>(
-            value: _chargeTypeFilter,
-            onChanged: (value) {
-              setState(() {
-                _chargeTypeFilter = value!;
-              });
-              _fetchStations(); 
-            },
-            items: <String>['', 'AC', 'DC', 'Hızlı Şarj'].map<DropdownMenuItem<String>>((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value),
-              );
-            }).toList(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: DropdownButton<String>(
+              isExpanded: true,
+              value: _chargeTypeFilter,
+              onChanged: (value) {
+                setState(() {
+                  _chargeTypeFilter = value!;
+                });
+                _fetchStations();
+              },
+              items: <String>['', 'AC', 'DC', 'Hızlı Şarj']
+                  .map<DropdownMenuItem<String>>((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value.isEmpty ? 'Tümü' : value),
+                );
+              }).toList(),
+            ),
           ),
           Expanded(
             child: FlutterMap(
@@ -313,12 +349,15 @@ class _MapPageState extends State<MapPage> {
                 onTap: (tapPosition, point) => _addCustomStation(point),
               ),
               children: [
-                TileLayer(
-                  urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                  subdomains: ['a', 'b', 'c'],
+                TileLayerWidget(
+                  options: TileLayerOptions(
+                    urlTemplate:
+                        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    subdomains: ['a', 'b', 'c'],
+                  ),
                 ),
-                MarkerLayer(
-                  markers: _markers,
+                MarkerLayerWidget(
+                  options: MarkerLayerOptions(markers: _markers),
                 ),
               ],
             ),
