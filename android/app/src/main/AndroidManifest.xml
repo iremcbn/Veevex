@@ -5,11 +5,14 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+
 
     <application
         android:label="veevex_"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <uses-library android:name="org.apache.http.legacy" android:required="false"/>
 
         <activity
             android:name=".MainActivity"

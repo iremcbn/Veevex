@@ -40,7 +40,20 @@ class FavoritesPage extends StatelessWidget {
                   subtitle: Text(
                     "Konum: ${favorite['latitude'].toStringAsFixed(4)}, ${favorite['longitude'].toStringAsFixed(4)}",
                   ),
-                  trailing: const Icon(Icons.favorite, color: Colors.red),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () async {
+                      await FirebaseFirestore.instance
+                          .collection('favorites')
+                          .doc(favorite.id)
+                          .delete();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("${favorite['stationName']} favorilerden kaldırıldı.")),
+                      );
+                    },
+                  ),
+                  onTap: () {
+                  },
                 ),
               );
             },

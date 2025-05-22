@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/charge_station.dart';
 
-class ChargeApiService {
+class ChargeApiService {  
   static Future<List<ChargeStation>> fetchStations(double latitude, double longitude) async {
     final url = Uri.parse(
         'https://api.openchargemap.io/v3/poi/?output=json&countrycode=TR&latitude=$latitude&longitude=$longitude&maxresults=20&compact=true&verbose=false');

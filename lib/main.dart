@@ -31,7 +31,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: const AuthGate(),
       routes: {
-        '/reservations': (context) => ReservationHistoryPage(),
+        '/reservations': (context) => const ReservationHistoryPage(),
         '/favorites': (context) => const FavoritesPage(),
       },
     );
@@ -60,57 +60,88 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-
 Future<String?> createPayment({
   required String email,
   required String stationTitle,
   required double amount,
   String userIp = '127.0.0.1',
 }) async {
-  final url = Uri.parse('https://yourbackend.com/api/payment/create'); 
+  final url = Uri.parse('https://yourbackend.com/api/payment/create');
 
-  final response = await http.post(
-    url,
-    headers: {'Content-Type': 'application/json'},
-    body: jsonEncode({
-      'Email': email,
-      'StationTitle': stationTitle,
-      'Amount': amount,
-      'UserIp': userIp,
-    }),
-  );
+  try {
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'Email': email,
+        'StationTitle': stationTitle,
+        'Amount': amount,
+        'UserIp': userIp,
+      }),
+    );
 
-  if (response.statusCode == 200) {
-    final data = jsonDecode(response.body);
-    return data['paymentUrl'];
-  } else {
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['paymentUrl'];
+    } else {
+      debugPrint('Payment creation failed: ${response.statusCode}');
+      return null;
+    }
+  } catch (e) {
+    debugPrint('Error creating payment: $e');
     return null;
   }
 }
 
-
-class PaymentWebView extends StatelessWidget {
+class PaymentPage extends StatefulWidget {
   final String paymentUrl;
 
-  const PaymentWebView({Key? key, required this.paymentUrl}) : super(key: key);
+  const PaymentPage({required this.paymentUrl, Key? key}) : super(key: key);
+
+  @override
+  State<PaymentPage> createState() => _PaymentPageState();
+}
+
+class _PaymentPageState extends State<PaymentPage> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (url) {
+            setState(() => _isLoading = false);
+          },
+          onNavigationRequest: (navigation) {
+            final url = navigation.url;
+            if (url.contains('odeme-basarili')) {
+              Navigator.pop(context, true);
+              return NavigationDecision.prevent;
+            } else if (url.contains('odeme-hata')) {
+              Navigator.pop(context, false);
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(widget.paymentUrl));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ödeme Sayfası')),
-      body: WebView(
-        initialUrl: paymentUrl,
-        javascriptMode: JavascriptMode.unrestricted,
-        navigationDelegate: (NavigationRequest request) {
-          if (request.url.contains('odeme-basarili')) {
-            Navigator.pop(context, 'success');
-            return NavigationDecision.prevent;
-          } else if (request.url.contains('odeme-hata')) {
-            Navigator.pop(context, 'failure');
-            return NavigationDecision.prevent;
-          }
-          return NavigationDecision.navigate;
-        },
+      appBar: AppBar(title: const Text("Ödeme")),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_isLoading)
+            const Center(child: CircularProgressIndicator()),
+        ],
       ),
     );
   }
@@ -130,15 +161,15 @@ class PaymentHomePage extends StatelessWidget {
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => PaymentWebView(paymentUrl: paymentUrl),
+          builder: (_) => PaymentPage(paymentUrl: paymentUrl),
         ),
       );
 
-      if (result == 'success') {
+      if (result == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ödeme başarılı!')),
         );
-      } else if (result == 'failure') {
+      } else if (result == false) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ödeme başarısız.')),
         );
