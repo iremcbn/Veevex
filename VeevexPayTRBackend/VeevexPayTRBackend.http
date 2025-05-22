@@ -1,0 +1,6 @@
+@VeevexPayTRBackend_HostAddress = http://localhost:5086
+
+GET {{VeevexPayTRBackend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
